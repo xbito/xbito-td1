@@ -6,7 +6,7 @@ import random
 # Detect if the game is running in debug mode from VSCode
 import os
 
-DEBUG = os.getenv("PYDEVD_DEBUG") == "1"
+DEBUG = "TERM_PROGRAM" in os.environ.keys() and os.environ["TERM_PROGRAM"] == "vscode"
 
 # Initialize Pygame
 pygame.init()
@@ -51,6 +51,16 @@ class GameState:
         self.resources = 500
         self.hit_points = 20
         self.game_over = False
+        self.enemies_spawned = 0
+        self.min_spawn_delay = 120  # Minimum delay 2 seconds to start
+        self.max_spawn_delay = 180  # Max 3 seconds between spawns at the start
+        self.min_spawn_delay_limit = 30
+        self.max_spawn_delay_limit = 60
+        self.acceleration_rate = 0.90  # Reduce delay by 5% every 10 enemies
+        if DEBUG:
+            self.enemies_until_acceleration = 5
+        else:
+            self.enemies_until_acceleration = 10
 
 
 game_state = GameState()
@@ -235,9 +245,32 @@ def draw_ui(surface, game_state):
         (width // 2 - hit_points_text.get_width() // 2, height - UI_HEIGHT + 20),
     )
 
-    # Draw Wave information (if you implement waves later)
-    # wave_text = font.render(f"Wave: {game_state.current_wave}", True, TEXT_COLOR)
-    # surface.blit(wave_text, (width - 120, height - UI_HEIGHT + 20))
+    # Draw debug information when in debug mode
+    if DEBUG:
+        debug_text = font.render(
+            f"Enemies spawned: {game_state.enemies_spawned}, Min Delay: {game_state.min_spawn_delay}, Max Delay: {game_state.max_spawn_delay}",
+            True,
+            YELLOW,
+        )
+        surface.blit(
+            debug_text, (width - debug_text.get_width() - 20, height - UI_HEIGHT + 5)
+        )
+
+
+def spawn_enemy():
+    game_state.enemies_spawned += 1
+    enemies.append(Enemy(waypoints))
+
+    # Accelerate spawn rate every 10 enemies
+    if game_state.enemies_spawned % game_state.enemies_until_acceleration == 0:
+        game_state.max_spawn_delay = max(
+            game_state.min_spawn_delay_limit,
+            int(game_state.max_spawn_delay * game_state.acceleration_rate),
+        )
+        game_state.min_spawn_delay = max(
+            game_state.min_spawn_delay_limit,
+            int(game_state.min_spawn_delay * game_state.acceleration_rate),
+        )
 
 
 # Main game loop
@@ -273,8 +306,10 @@ while running:
     if not game_state.game_over:
         # Spawn enemies
         spawn_timer += 1
-        if spawn_timer >= spawn_interval:
-            enemies.append(Enemy(waypoints))
+        if spawn_timer >= random.randint(
+            game_state.min_spawn_delay, game_state.max_spawn_delay
+        ):
+            spawn_enemy()
             spawn_timer = 0
 
         # Clear the screen
