@@ -135,20 +135,14 @@ class Tower:
         self.x = grid_x * GRID_SIZE + GRID_SIZE // 2
         self.y = grid_y * GRID_SIZE + GRID_SIZE // 2
         self.range = 150
-        self.damage = 20  # Increased from 10 to 20
+        self.damage = 20
         self.color = GREEN
         self.size = 30
         self.target = None
-        self.attack_cooldown = 45  # Reduced from 60 to 45 frames (faster attacks)
+        self.attack_cooldown = 45
         self.attack_timer = 0
-
-    def draw(self, surface):
-        pygame.draw.rect(
-            surface,
-            self.color,
-            (self.x - self.size // 2, self.y - self.size // 2, self.size, self.size),
-        )
-        pygame.draw.circle(surface, self.color, (self.x, self.y), self.range, 1)
+        self.attack_duration = 5  # Number of frames to show the attack line
+        self.current_attack_duration = 0
 
     def detect_enemies(self, enemies):
         self.target = None
@@ -163,11 +157,23 @@ class Tower:
             if self.target.take_damage(self.damage):
                 enemies.remove(self.target)
             self.attack_timer = self.attack_cooldown
+            self.current_attack_duration = self.attack_duration
         elif self.attack_timer > 0:
             self.attack_timer -= 1
 
+        if self.current_attack_duration > 0:
+            self.current_attack_duration -= 1
+
+    def draw(self, surface):
+        pygame.draw.rect(
+            surface,
+            self.color,
+            (self.x - self.size // 2, self.y - self.size // 2, self.size, self.size),
+        )
+        pygame.draw.circle(surface, self.color, (self.x, self.y), self.range, 1)
+
     def draw_attack(self, surface):
-        if self.target and self.attack_timer == self.attack_cooldown:
+        if self.target and self.current_attack_duration > 0:
             pygame.draw.line(
                 surface, RED, (self.x, self.y), (self.target.x, self.target.y), 2
             )
