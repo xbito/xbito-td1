@@ -2,14 +2,16 @@ import pygame
 import sys
 import math
 import random
+import numpy as np
 
 # Detect if the game is running in debug mode from VSCode
 import os
 
 DEBUG = "TERM_PROGRAM" in os.environ.keys() and os.environ["TERM_PROGRAM"] == "vscode"
 
-# Initialize Pygame
+# Initialize Pygame and its mixer
 pygame.init()
+pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
 
 # Set up the display
 width, height = 800, 600
@@ -64,6 +66,32 @@ class GameState:
 
 
 game_state = GameState()
+
+
+def create_explosion_sound(duration_ms=300, frequency=440):
+    sample_rate = 44100
+    t = np.linspace(
+        0, duration_ms / 1000.0, int(duration_ms * sample_rate / 1000.0), False
+    )
+
+    # Generate a decaying sine wave
+    waveform = np.sin(2 * np.pi * frequency * t) * np.exp(-t * 10)
+
+    # Add some noise for a more "explosive" sound
+    noise = np.random.rand(len(waveform)) * 0.1
+    waveform = waveform + noise
+
+    # Normalize to 16-bit range
+    waveform = np.int16(waveform / np.max(np.abs(waveform)) * 32767)
+
+    # Convert to stereo
+    stereo_waveform = np.column_stack((waveform, waveform))
+
+    return pygame.sndarray.make_sound(stereo_waveform)
+
+
+# Create the explosion sound
+enemy_destroy_sound = create_explosion_sound()
 
 
 class Enemy:
@@ -125,6 +153,8 @@ class Enemy:
 
     def take_damage(self, damage):
         self.health -= damage
+        if self.health <= 0:
+            enemy_destroy_sound.play()  # Play the generated sound when the enemy is destroyed
         return self.health <= 0
 
 
