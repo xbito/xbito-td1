@@ -54,15 +54,11 @@ class GameState:
         self.hit_points = 20
         self.game_over = False
         self.enemies_spawned = 0
-        self.min_spawn_delay = 120  # Minimum delay 2 seconds to start
-        self.max_spawn_delay = 180  # Max 3 seconds between spawns at the start
-        self.min_spawn_delay_limit = 30
-        self.max_spawn_delay_limit = 60
-        self.acceleration_rate = 0.90  # Reduce delay by 5% every 10 enemies
-        if DEBUG:
-            self.enemies_until_acceleration = 5
-        else:
-            self.enemies_until_acceleration = 10
+        self.min_spawn_delay = 50
+        self.max_spawn_delay = 180
+        self.acceleration_rate = 0.95
+        self.current_enemy_type = 0
+        self.enemies_in_current_group = 0
 
 
 game_state = GameState()
@@ -100,10 +96,11 @@ class Enemy:
         self.path = path
         self.path_index = 0
         self.x, self.y = self.path[0]
-        self.speed = random.uniform(1, 2)
         self.size = 20
-        self.health = 50
-        self.max_health = 50
+        self.color = (255, 0, 0)  # Default color (red)
+        self.health = 100
+        self.max_health = 100
+        self.speed = 2
 
     def move(self):
         if self.path_index < len(self.path) - 1:
@@ -119,44 +116,78 @@ class Enemy:
                 self.x += dx * move_ratio
                 self.y += dy * move_ratio
 
-    def draw(self, surface):
-        # Draw enemy
-        pygame.draw.rect(
-            surface,
-            BLUE,
-            (self.x - self.size // 2, self.y - self.size // 2, self.size, self.size),
-        )
-
-        # Draw health bar
-        health_bar_width = 30
-        health_bar_height = 5
-        health_ratio = self.health / self.max_health
-        pygame.draw.rect(
-            surface,
-            RED,
-            (
-                self.x - health_bar_width // 2,
-                self.y - self.size // 2 - 10,
-                health_bar_width,
-                health_bar_height,
-            ),
-        )
-        pygame.draw.rect(
-            surface,
-            GREEN,
-            (
-                self.x - health_bar_width // 2,
-                self.y - self.size // 2 - 10,
-                health_bar_width * health_ratio,
-                health_bar_height,
-            ),
-        )
-
     def take_damage(self, damage):
         self.health -= damage
         if self.health <= 0:
-            enemy_destroy_sound.play()  # Play the generated sound when the enemy is destroyed
+            enemy_destroy_sound.play()
         return self.health <= 0
+
+    def draw(self, surface):
+        # Draw health bar
+        health_bar_width = 30
+        health_ratio = self.health / self.max_health
+        pygame.draw.rect(
+            surface,
+            (255, 0, 0),
+            (self.x - health_bar_width // 2, self.y - 20, health_bar_width, 5),
+        )
+        pygame.draw.rect(
+            surface,
+            (0, 255, 0),
+            (
+                self.x - health_bar_width // 2,
+                self.y - 20,
+                health_bar_width * health_ratio,
+                5,
+            ),
+        )
+
+
+class SquareEnemy(Enemy):
+    def __init__(self, path):
+        super().__init__(path)
+        self.color = (255, 0, 0)  # Red
+
+    def draw(self, surface):
+        pygame.draw.rect(
+            surface,
+            self.color,
+            (self.x - self.size // 2, self.y - self.size // 2, self.size, self.size),
+        )
+        super().draw(surface)
+
+
+class TriangleEnemy(Enemy):
+    def __init__(self, path):
+        super().__init__(path)
+        self.color = (0, 255, 0)  # Green
+        self.speed = 3  # Faster than other enemies
+        self.health = 75
+        self.max_health = 75
+
+    def draw(self, surface):
+        points = [
+            (self.x, self.y - self.size // 2),
+            (self.x - self.size // 2, self.y + self.size // 2),
+            (self.x + self.size // 2, self.y + self.size // 2),
+        ]
+        pygame.draw.polygon(surface, self.color, points)
+        super().draw(surface)
+
+
+class CircleEnemy(Enemy):
+    def __init__(self, path):
+        super().__init__(path)
+        self.color = (0, 0, 255)  # Blue
+        self.health = 150
+        self.max_health = 150
+        self.speed = 1.5  # Slower than other enemies
+
+    def draw(self, surface):
+        pygame.draw.circle(
+            surface, self.color, (int(self.x), int(self.y)), self.size // 2
+        )
+        super().draw(surface)
 
 
 class Tower:
@@ -295,18 +326,21 @@ def draw_ui(surface, game_state):
 
 
 def spawn_enemy():
-    game_state.enemies_spawned += 1
-    enemies.append(Enemy(waypoints))
+    enemy_types = [SquareEnemy, TriangleEnemy, CircleEnemy]
+    new_enemy = enemy_types[game_state.current_enemy_type](waypoints.copy())
+    enemies.append(new_enemy)
 
-    # Accelerate spawn rate every 10 enemies
-    if game_state.enemies_spawned % game_state.enemies_until_acceleration == 0:
+    game_state.enemies_spawned += 1
+    game_state.enemies_in_current_group += 1
+
+    if game_state.enemies_in_current_group == 5:
+        game_state.current_enemy_type = (game_state.current_enemy_type + 1) % 3
+        game_state.enemies_in_current_group = 0
+
+    if game_state.enemies_spawned % 10 == 0:
         game_state.max_spawn_delay = max(
-            game_state.min_spawn_delay_limit,
+            game_state.min_spawn_delay,
             int(game_state.max_spawn_delay * game_state.acceleration_rate),
-        )
-        game_state.min_spawn_delay = max(
-            game_state.min_spawn_delay_limit,
-            int(game_state.min_spawn_delay * game_state.acceleration_rate),
         )
 
 
