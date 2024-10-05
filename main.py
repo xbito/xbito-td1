@@ -3,6 +3,7 @@ import sys
 import math
 import random
 import numpy as np
+import pygame.gfxdraw
 
 # Detect if the game is running in debug mode from VSCode
 import os
@@ -19,12 +20,15 @@ screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption("Tower Defense with Enemy Spawning")
 
 # Colors
-BLACK = (0, 0, 0)
+BACKGROUND = (10, 10, 30)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
+NEON_PINK = (255, 20, 147)
+NEON_CYAN = (0, 255, 255)
+NEON_GREEN = (57, 255, 20)
 
 # Waypoints for the enemy path
 waypoints = [(50, 50), (750, 50), (750, 550), (50, 550), (50, 300), (400, 300)]
@@ -91,17 +95,67 @@ enemy_destroy_sound = create_explosion_sound()
 enemy_destroy_sound.set_volume(0.1)
 
 
+def draw_neon_shape(surface, color, center, size, shape="circle"):
+    x, y = map(int, center)
+    base_color = pygame.Color(*color[:3])
+    glow_color = base_color.lerp(pygame.Color("white"), 0.5)
+    glow_color.a = 100  # Increased opacity for better visibility
+
+    glow_sizes = [size + 4, size + 2, size]  # Multiple layers for stronger glow effect
+
+    for glow_size in glow_sizes:
+        if shape == "circle":
+            pygame.gfxdraw.filled_circle(surface, x, y, glow_size, glow_color)
+            pygame.gfxdraw.aacircle(surface, x, y, glow_size, glow_color)
+        elif shape == "square":
+            pygame.gfxdraw.box(
+                surface,
+                (x - glow_size, y - glow_size, glow_size * 2, glow_size * 2),
+                glow_color,
+            )
+            pygame.gfxdraw.rectangle(
+                surface,
+                (x - glow_size, y - glow_size, glow_size * 2, glow_size * 2),
+                glow_color,
+            )
+        elif shape == "triangle":
+            points = [
+                (x, y - glow_size),
+                (x - glow_size, y + glow_size),
+                (x + glow_size, y + glow_size),
+            ]
+            pygame.gfxdraw.filled_polygon(surface, points, glow_color)
+            pygame.gfxdraw.aapolygon(surface, points, glow_color)
+
+    # Draw the main shape
+    if shape == "circle":
+        pygame.gfxdraw.filled_circle(surface, x, y, size, color)
+        pygame.gfxdraw.aacircle(surface, x, y, size, color)
+    elif shape == "square":
+        pygame.gfxdraw.box(surface, (x - size, y - size, size * 2, size * 2), color)
+        pygame.gfxdraw.rectangle(
+            surface, (x - size, y - size, size * 2, size * 2), color
+        )
+    elif shape == "triangle":
+        points = [(x, y - size), (x - size, y + size), (x + size, y + size)]
+        pygame.gfxdraw.filled_polygon(surface, points, color)
+        pygame.gfxdraw.aapolygon(surface, points, color)
+
+
 class Enemy:
     def __init__(self, path):
         self.path = path
         self.path_index = 0
         self.x, self.y = self.path[0]
-        self.size = 20
-        self.color = (255, 0, 0)  # Default color (red)
+        self.size = 12  # Slightly increased size for better visibility
+        self.color = (255, 0, 0, 255)  # Full opacity for the main shape
         self.health = 100
         self.max_health = 100
         self.speed = 2
-        self.resource_reward = 10  # Default resource reward
+        self.resource_reward = 10
+        self.shape = "circle"  # Default shape
+        self.glow_offset = 0
+        self.glow_direction = 1
 
     def move(self):
         if self.path_index < len(self.path) - 1:
@@ -124,23 +178,24 @@ class Enemy:
         return self.health <= 0
 
     def draw(self, surface):
-        # Draw health bar
-        health_bar_width = 30
-        health_ratio = self.health / self.max_health
-        pygame.draw.rect(
+        # Pulsing glow effect
+        self.glow_offset += 0.2 * self.glow_direction
+        if self.glow_offset > 2 or self.glow_offset < 0:
+            self.glow_direction *= -1
+
+        draw_neon_shape(
             surface,
-            (255, 0, 0),
-            (self.x - health_bar_width // 2, self.y - 20, health_bar_width, 5),
+            self.color,
+            (self.x, self.y),
+            self.size + int(self.glow_offset),
+            self.shape,
         )
+
+        # Health bar
+        health_ratio = self.health / self.max_health
+        pygame.draw.rect(surface, (255, 0, 0, 128), (self.x - 15, self.y - 20, 30, 5))
         pygame.draw.rect(
-            surface,
-            (0, 255, 0),
-            (
-                self.x - health_bar_width // 2,
-                self.y - 20,
-                health_bar_width * health_ratio,
-                5,
-            ),
+            surface, (0, 255, 0, 128), (self.x - 15, self.y - 20, 30 * health_ratio, 5)
         )
 
     def get_resource_reward(self):
@@ -150,51 +205,30 @@ class Enemy:
 class SquareEnemy(Enemy):
     def __init__(self, path):
         super().__init__(path)
-        self.color = (255, 0, 0)  # Red
-        self.resource_reward = 10  # Standard reward
-
-    def draw(self, surface):
-        pygame.draw.rect(
-            surface,
-            self.color,
-            (self.x - self.size // 2, self.y - self.size // 2, self.size, self.size),
-        )
-        super().draw(surface)
+        self.color = (255, 0, 0, 255)  # Red
+        self.shape = "square"
 
 
 class TriangleEnemy(Enemy):
     def __init__(self, path):
         super().__init__(path)
-        self.color = (0, 255, 0)  # Green
-        self.speed = 3  # Faster than other enemies
+        self.color = (0, 255, 0, 255)  # Green
+        self.speed = 3
         self.health = 75
         self.max_health = 75
-        self.resource_reward = 15  # Higher reward due to difficulty
-
-    def draw(self, surface):
-        points = [
-            (self.x, self.y - self.size // 2),
-            (self.x - self.size // 2, self.y + self.size // 2),
-            (self.x + self.size // 2, self.y + self.size // 2),
-        ]
-        pygame.draw.polygon(surface, self.color, points)
-        super().draw(surface)
+        self.resource_reward = 15
+        self.shape = "triangle"
 
 
 class CircleEnemy(Enemy):
     def __init__(self, path):
         super().__init__(path)
-        self.color = (0, 0, 255)  # Blue
+        self.color = (0, 0, 255, 255)  # Blue
         self.health = 150
         self.max_health = 150
-        self.speed = 1.5  # Slower than other enemies
-        self.resource_reward = 20  # Highest reward due to high health
-
-    def draw(self, surface):
-        pygame.draw.circle(
-            surface, self.color, (int(self.x), int(self.y)), self.size // 2
-        )
-        super().draw(surface)
+        self.speed = 1.5
+        self.resource_reward = 20
+        self.shape = "circle"
 
 
 class Tower:
@@ -205,7 +239,7 @@ class Tower:
         self.y = grid_y * GRID_SIZE + GRID_SIZE // 2
         self.range = 150
         self.damage = 20
-        self.color = GREEN
+        self.color = NEON_CYAN
         self.size = 30
         self.target = None
         self.attack_cooldown = 45
@@ -239,13 +273,16 @@ class Tower:
             surface,
             self.color,
             (self.x - self.size // 2, self.y - self.size // 2, self.size, self.size),
+            2,
         )
-        pygame.draw.circle(surface, self.color, (self.x, self.y), self.range, 1)
+        pygame.draw.circle(
+            surface, self.color, (int(self.x), int(self.y)), self.range, 1
+        )
 
     def draw_attack(self, surface):
         if self.target and self.current_attack_duration > 0:
             pygame.draw.line(
-                surface, RED, (self.x, self.y), (self.target.x, self.target.y), 2
+                surface, NEON_CYAN, (self.x, self.y), (self.target.x, self.target.y), 2
             )
 
 
@@ -352,6 +389,11 @@ def spawn_enemy():
         )
 
 
+def draw_path(surface, waypoints):
+    if len(waypoints) > 1:
+        pygame.draw.lines(surface, NEON_GREEN, False, waypoints, 2)
+
+
 # Main game loop
 clock = pygame.time.Clock()
 running = True
@@ -392,20 +434,15 @@ while running:
             spawn_timer = 0
 
         # Clear the screen
-        screen.fill(BLACK)
+        screen.fill(BACKGROUND)
 
-        # Draw the grid
+        # Draw grid
         for x in range(0, width, GRID_SIZE):
-            pygame.draw.line(screen, (50, 50, 50), (x, 0), (x, height))
+            pygame.draw.line(screen, (30, 30, 50), (x, 0), (x, height))
         for y in range(0, height, GRID_SIZE):
-            pygame.draw.line(screen, (50, 50, 50), (0, y), (width, y))
+            pygame.draw.line(screen, (30, 30, 50), (0, y), (width, y))
 
-        # Draw the path
-        pygame.draw.lines(screen, WHITE, False, waypoints, 4)
-
-        # Draw waypoints
-        for point in waypoints:
-            pygame.draw.circle(screen, RED, point, 10)
+        draw_path(screen, waypoints)
 
         # Update and draw enemies
         for enemy in enemies[:]:
