@@ -13,10 +13,9 @@ For phase 1, we are building a simple single player tower defense game that runs
 
 I'll consider adding:
 
--  Different types of enemies
 -  Different types of towers
 -  Different tracks
--  An economy system for towers (selling, upgrading, earning money from enemies)
+-  An economy system for towers (selling, upgrading)
 -  Varying difficulty levels
 -  More randomness.
 
