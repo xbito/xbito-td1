@@ -92,6 +92,7 @@ def create_explosion_sound(duration_ms=300, frequency=440):
 
 # Create the explosion sound
 enemy_destroy_sound = create_explosion_sound()
+enemy_destroy_sound.set_volume(0.1)
 
 
 class Enemy:
