@@ -330,7 +330,7 @@ large_font = pygame.font.Font(None, 72)
 
 
 def draw_game_over_screen(screen):
-    screen.fill(BLACK)
+    screen.fill(BACKGROUND)
     game_over_text = large_font.render("GAME OVER", True, RED)
     restart_text = font.render("Press R to Restart", True, WHITE)
     screen.blit(
