@@ -101,6 +101,7 @@ class Enemy:
         self.health = 100
         self.max_health = 100
         self.speed = 2
+        self.resource_reward = 10  # Default resource reward
 
     def move(self):
         if self.path_index < len(self.path) - 1:
@@ -142,11 +143,15 @@ class Enemy:
             ),
         )
 
+    def get_resource_reward(self):
+        return self.resource_reward
+
 
 class SquareEnemy(Enemy):
     def __init__(self, path):
         super().__init__(path)
         self.color = (255, 0, 0)  # Red
+        self.resource_reward = 10  # Standard reward
 
     def draw(self, surface):
         pygame.draw.rect(
@@ -164,6 +169,7 @@ class TriangleEnemy(Enemy):
         self.speed = 3  # Faster than other enemies
         self.health = 75
         self.max_health = 75
+        self.resource_reward = 15  # Higher reward due to difficulty
 
     def draw(self, surface):
         points = [
@@ -182,6 +188,7 @@ class CircleEnemy(Enemy):
         self.health = 150
         self.max_health = 150
         self.speed = 1.5  # Slower than other enemies
+        self.resource_reward = 20  # Highest reward due to high health
 
     def draw(self, surface):
         pygame.draw.circle(
@@ -214,9 +221,10 @@ class Tower:
                 self.target = enemy
                 break
 
-    def attack(self, enemies):
+    def attack(self, enemies, game_state):
         if self.target and self.attack_timer <= 0:
             if self.target.take_damage(self.damage):
+                game_state.resources += self.target.get_resource_reward()
                 enemies.remove(self.target)
             self.attack_timer = self.attack_cooldown
             self.current_attack_duration = self.attack_duration
@@ -412,7 +420,7 @@ while running:
         # Update and draw towers
         for tower in towers:
             tower.detect_enemies(enemies)
-            tower.attack(enemies)
+            tower.attack(enemies, game_state)
             tower.draw(screen)
             tower.draw_attack(screen)
 
