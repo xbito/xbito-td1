@@ -192,10 +192,34 @@ class Enemy:
         )
 
         # Health bar
+        health_bar_width = 20  # Reduced width
+        health_bar_height = 3  # Reduced height
+        health_bar_y_offset = 15  # Increased offset to separate from sprite
+
         health_ratio = self.health / self.max_health
-        pygame.draw.rect(surface, (255, 0, 0, 128), (self.x - 15, self.y - 20, 30, 5))
+
+        # Background of health bar (red)
         pygame.draw.rect(
-            surface, (0, 255, 0, 128), (self.x - 15, self.y - 20, 30 * health_ratio, 5)
+            surface,
+            (255, 0, 0, 180),
+            (
+                self.x - health_bar_width // 2,
+                self.y - self.size - health_bar_y_offset,
+                health_bar_width,
+                health_bar_height,
+            ),
+        )
+
+        # Foreground of health bar (green)
+        pygame.draw.rect(
+            surface,
+            (0, 255, 0, 180),
+            (
+                self.x - health_bar_width // 2,
+                self.y - self.size - health_bar_y_offset,
+                int(health_bar_width * health_ratio),
+                health_bar_height,
+            ),
         )
 
     def get_resource_reward(self):
